@@ -10,7 +10,7 @@
         <h1>Cálculo de Derivadas de Funções Polinomiais</h1>
         <form id="derivativeForm">
             <label for="polynomial">Qual função f(x) deseja calcular a derivada?</label>
-            <input type="text" id="polynomial" name="polynomial" placeholder="Ex: x^3 - 2x^2 - 1" required>
+            <input type="text" id="polynomial" name="polynomial" placeholder="Ex: x^3 + 2x^2 - 1" required>
             
             <button type="button" onclick="calculateDerivative()">Calcular Derivada</button>
         </form>
@@ -28,7 +28,6 @@
             <input type="number" id="tangentValueA" name="tangentValueA" placeholder="Valor de a">
             <button type="button" onclick="calculateTangentLine()">Calcular Reta Tangente</button>
         </div>
-        <p>Made with ❤️ by Amin</p>
     </div>
     <style>
         body {
@@ -98,30 +97,13 @@
         }
 
         function parsePolynomial(polynomial) {
-            polynomial = formatPolynomial(polynomial);
-            const terms = polynomial.match(/[+-]?[^+-]+/g);
-            const parsedTerms = terms.map(term => {
-                const match = term.match(/([+-]?\d*\.?\d*)?x(?:\^(\d+))?/);
-                if (match) {
-                    const coefficient = match[1] === '' || match[1] === '+' || match[1] === undefined ? 1 : (match[1] === '-' ? -1 : parseFloat(match[1]));
-                    const exponent = match[2] ? parseInt(match[2]) : (term.includes('x') ? 1 : 0);
-                    return { coefficient, exponent };
-                } else {
-                    return { coefficient: parseFloat(term), exponent: 0 };
-                }
+            let terms = polynomial.match(/-?\d*x\^\d+|-?\d*x|-?\d+/g);
+            return terms.map(term => {
+                let [match, coef, exp] = term.match(/(-?\d+)?x\^?(\d+)?/) || [];
+                coef = coef ? parseInt(coef) : (term.includes('x') ? 1 : 0);
+                exp = exp ? parseInt(exp) : (term.includes('x') ? 1 : 0);
+                return { coefficient: coef, exponent: exp };
             });
-
-            const combinedTerms = parsedTerms.reduce((acc, term) => {
-                const existingTerm = acc.find(t => t.exponent === term.exponent);
-                if (existingTerm) {
-                    existingTerm.coefficient += term.coefficient;
-                } else {
-                    acc.push(term);
-                }
-                return acc;
-            }, []);
-            
-            return combinedTerms;
         }
 
         function derivativeTerm(term) {
@@ -134,8 +116,12 @@
 
         function formatTerm(term) {
             if (!term || isNaN(term.coefficient) || term.coefficient === 0) return '';
-            const coef = term.coefficient === 1 ? '' : (term.coefficient === -1 ? '-' : term.coefficient.toString());
-            const exp = term.exponent === 0 ? '' : (term.exponent === 1 ? 'x' : `x^${term.exponent}`);
+            const coef = term.coefficient === 1 && term.exponent !== 0 ? '' :
+                        term.coefficient === -1 && term.exponent !== 0 ? '-' :
+                        term.coefficient.toFixed(2).replace(/\.00$/, ''); // Remove .00
+            const exp = term.exponent === 0 ? '' :
+                        term.exponent === 1 ? 'x' :
+                        `x^${term.exponent}`;
             return `${coef}${exp}`;
         }
 
@@ -143,8 +129,8 @@
             const polynomial = document.getElementById('polynomial').value;
             const terms = parsePolynomial(polynomial);
             const derivativeTerms = terms.map(derivativeTerm).filter(Boolean);
-            let derivative = derivativeTerms.map(formatTerm).filter(Boolean).join(' + ');
-            derivative = derivative.replace(/\+ -/g, '- ').replace(/\+ \+/g, '+').replace(/\- \+/g, '-').trim();
+            let derivative = derivativeTerms.map(formatTerm).join(' + ').replace(/\+ -/g, '- ');
+            if (derivative.trim() === '') derivative = '0';
 
             document.getElementById('results').innerHTML = `<p>f(x) = ${polynomial}</p><p>f'(x) = ${derivative}</p>`;
             document.getElementById('functionalValueSection').style.display = 'block';
@@ -153,13 +139,26 @@
             document.getElementById('tangentValueA').value = '';
         }
 
+        function evaluatePolynomial(terms, x) {
+            return terms.reduce((acc, term) => {
+                // Adiciona um log para ver o cálculo de cada termo
+                console.log(`Calculando: ${term.coefficient} * ${x}^${term.exponent} = ${term.coefficient * Math.pow(x, term.exponent)}`);
+                return acc + term.coefficient * Math.pow(x, term.exponent);
+            }, 0);
+        }
+
         function calculateFunctionalValue() {
             const valueA = parseFloat(document.getElementById('valueA').value);
+            if (isNaN(valueA)) {
+                alert('Por favor, insira um valor numérico para a.');
+                return;
+            }
             const polynomial = document.getElementById('polynomial').value;
             const terms = parsePolynomial(polynomial);
+            const fOfA = evaluatePolynomial(terms, valueA);
+
             const derivativeTerms = terms.map(derivativeTerm).filter(term => term !== null);
-            const fPrimeOfA = derivativeTerms.reduce((acc, term) => acc + term.coefficient * Math.pow(valueA, term.exponent), 0);
-            const fOfA = terms.reduce((acc, term) => acc + term.coefficient * Math.pow(valueA, term.exponent), 0);
+            const fPrimeOfA = evaluatePolynomial(derivativeTerms, valueA);
 
             document.getElementById('results').innerHTML += `<p>a = ${valueA}</p><p>f(a) = ${fOfA}</p><p>f'(a) = ${fPrimeOfA}</p>`;
             document.getElementById('tangentLineSection').style.display = 'block';
@@ -167,11 +166,17 @@
 
         function calculateTangentLine() {
             const tangentValueA = parseFloat(document.getElementById('tangentValueA').value);
+            if (isNaN(tangentValueA)) {
+                alert('Por favor, insira um valor numérico para a.');
+                return;
+            }
             const polynomial = document.getElementById('polynomial').value;
             const terms = parsePolynomial(polynomial);
+            const fOfA = evaluatePolynomial(terms, tangentValueA);
+
             const derivativeTerms = terms.map(derivativeTerm).filter(term => term !== null);
-            const fPrimeOfA = derivativeTerms.reduce((acc, term) => acc + term.coefficient * Math.pow(tangentValueA, term.exponent), 0);
-            const fOfA = terms.reduce((acc, term) => acc + term.coefficient * Math.pow(tangentValueA, term.exponent), 0);
+            const fPrimeOfA = evaluatePolynomial(derivativeTerms, tangentValueA);
+
             const tangentLine = `y = ${fPrimeOfA}x + (${fOfA - fPrimeOfA * tangentValueA})`;
 
             document.getElementById('results').innerHTML += `<p>A equação da reta tangente ao gráfico de f(x) = ${polynomial} no ponto P = (${tangentValueA}, ${fOfA}) será ${tangentLine}</p>`;
